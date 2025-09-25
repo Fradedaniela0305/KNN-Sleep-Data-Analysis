@@ -86,7 +86,15 @@ balanced_sleep_tidy <- balanced_sleep |>
   select(-BMI_Category, -Gender)
 
 
-sleep_split <- initial_split(balanced_sleep_tidy, prop = 0.70, strata = Sleep_Disorder)
+standardize_recipe <- recipe(Sleep_Disorder ~ ., data = balanced_sleep_tidy) |>
+  step_scale(all_predictors()) |>
+  step_center(all_predictors()) |>
+  prep()
+
+standardized_sleep <- bake(standardize_recipe, balanced_sleep_tidy)
+
+
+sleep_split <- initial_split(standardized_sleep, prop = 0.70, strata = Sleep_Disorder)
 sleep_train <- training(sleep_split)
 sleep_test <- testing(sleep_split)
 
