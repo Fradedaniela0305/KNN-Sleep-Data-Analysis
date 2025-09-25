@@ -73,8 +73,10 @@ knn_results <- workflow() |>
   tune_grid(resamples = num_vfold, grid = k_vals) |>
   collect_metrics()
 
+
 accuracies <- knn_results |> 
   filter(.metric == "accuracy")
+accuracies
 
 k_plot <- accuracies |>
   ggplot(aes(x = neighbors, y = mean)) +
@@ -103,3 +105,5 @@ knn_fit <- workflow() |>
 
 sleep_test_pred <- predict(knn_fit, sleep_testing) |>
   bind_cols(sleep_testing) 
+
+
