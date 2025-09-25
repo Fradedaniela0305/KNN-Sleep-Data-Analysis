@@ -1,12 +1,11 @@
 set.seed(123)
 
 library(tidyverse)
-library(themis)
+library(repr)
 library(tidymodels)
-library(tidyr)
+library(themis)
 
 sleep_data <- read_csv("data/Sleep_health_and_lifestyle_dataset.csv")
-head(sleep_data)
 
 sleep_data_clean <- sleep_data |>
   select(-`Person ID`, -`Heart Rate`, -`Occupation`)|>
@@ -21,6 +20,16 @@ sleep_data_clean <- sleep_data |>
   rename(BMI_Category = `BMI Category`)|>
   rename(Blood_Pressure = `Blood Pressure`)|>
   rename(Daily_Steps = `Daily Steps`)|>
+  separate(Blood_Pressure, into = c("Systolic", "Diastolic"), sep = "/") |>
+  mutate(Systolic = as.numeric(Systolic), Diastolic = as.numeric(Diastolic)) |>
+  mutate(BMI_num = case_when(BMI_Category == "Underweight" ~ 1, 
+                             BMI_Category == "Normal"~ 2,
+                             BMI_Category == "Overweight"  ~ 3, 
+                             BMI_Category == "Obese" ~ 4))|>
+  
+  mutate(Gender_num = case_when(Gender == "Male" ~ 1, 
+                                Gender == "Female"~ 2,))|>
+  select(-BMI_Category, -Gender) |>
   
   mutate(Sleep_Disorder = as_factor(Sleep_Disorder)) |>
   drop_na()
@@ -28,38 +37,6 @@ sleep_data_clean <- sleep_data |>
 
 
 counts_graph <- ggplot(sleep_data_clean, aes(x = Sleep_Disorder, fill = Sleep_Disorder)) + 
-  geom_bar() + 
-  xlab("Sleep Disorder") +
-  ylab("Count") + 
-  ggtitle("Count of Observations per Sleep Disorder Class")+
-  theme(
-    axis.title = element_text(size = 20),   
-    axis.text = element_text(size = 12),    
-    plot.title = element_text(size = 16),  
-    legend.title = element_text(size = 14),  
-    legend.text = element_text(size = 12)) +
-  scale_fill_manual(values = c("darkorange", "darkblue", "darkred"))
-counts_graph
-
-
-number_of_observations <- nrow(sleep_data_clean)
-count <- sleep_data_clean |>
-  group_by(Sleep_Disorder) |>
-  summarise(count = n(), percentage = n() / number_of_observations * 100)
-count
-
-
-over_sample_recipe <- recipe(Sleep_Disorder ~ ., data = sleep_data_clean) |>
-  step_upsample(Sleep_Disorder, over_ratio = 1, skip = FALSE) |>
-  prep()
-
-balanced_sleep <- bake(over_sample_recipe, sleep_data_clean)
-
-balanced_sleep |>
-  group_by(Sleep_Disorder) |>
-  summarize(n = n())
-
-counts_graph <- ggplot(balanced_sleep, aes(x = Sleep_Disorder, fill = Sleep_Disorder)) + 
   geom_bar() + 
   xlab("Sleep Disorder") +
   ylab("Count") +
@@ -71,31 +48,58 @@ counts_graph <- ggplot(balanced_sleep, aes(x = Sleep_Disorder, fill = Sleep_Diso
     legend.title = element_text(size = 14),  
     legend.text = element_text(size = 12)) +
   scale_fill_manual(values = c("darkorange", "darkblue", "darkred"))
-counts_graph
-
-balanced_sleep_tidy <- balanced_sleep |>
-  separate(Blood_Pressure, into = c("Systolic", "Diastolic"), sep = "/") |>
-  mutate(Systolic = as.numeric(Systolic), Diastolic = as.numeric(Diastolic)) |>
-  mutate(BMI_num = case_when(BMI_Category == "Underweight" ~ 1, 
-                             BMI_Category == "Normal"~ 2,
-                             BMI_Category == "Overweight"  ~ 3, 
-                             BMI_Category == "Obese" ~ 4))|>
-  
-  mutate(Gender_num = case_when(Gender == "Male" ~ 1, 
-                                Gender == "Female"~ 2,))|>
-  select(-BMI_Category, -Gender)
 
 
-standardize_recipe <- recipe(Sleep_Disorder ~ ., data = balanced_sleep_tidy) |>
+sleep_split <- initial_split(sleep_data_clean, prop = 0.75, strata = Sleep_Disorder)
+sleep_training <- training(sleep_split)
+sleep_testing <- testing(sleep_split)
+
+knn_tune <- nearest_neighbor(weight_func = "rectangular", neighbors = tune()) |>
+  set_engine("kknn") |>
+  set_mode("classification")
+
+k_vals <- tibble(neighbors = seq(from = 1, to = 10, by = 1))
+
+num_vfold <- vfold_cv(sleep_training, v = 5, strata = Sleep_Disorder)
+
+sleep_recipe <- recipe(Sleep_Disorder ~ ., data = sleep_training) |>
+  step_upsample(Sleep_Disorder, over_ratio = 1, skip = TRUE) |>
   step_scale(all_predictors()) |>
-  step_center(all_predictors()) |>
-  prep()
+  step_center(all_predictors())
 
-standardized_sleep <- bake(standardize_recipe, balanced_sleep_tidy)
+knn_results <- workflow() |>
+  add_recipe(sleep_recipe) |> 
+  add_model(knn_tune) |>
+  tune_grid(resamples = num_vfold, grid = k_vals) |>
+  collect_metrics()
+
+accuracies <- knn_results |> 
+  filter(.metric == "accuracy")
+
+k_plot <- accuracies |>
+  ggplot(aes(x = neighbors, y = mean)) +
+  geom_point() +
+  geom_line() +
+  labs(title = "Accuracy vs K", x = "Neighbors", y = "Accuracy Estimate") +
+  scale_x_continuous(breaks = seq(0, 10, by = 1)) +  # adjusting the x-axis
+  scale_y_continuous(limits = c(0.4, 1.0)) # adjusting the y-axis
+k_plot
+
+best_k <- accuracies |>
+  arrange(desc(mean)) |>
+  head(1) |>
+  pull(neighbors)
+best_k
 
 
-sleep_split <- initial_split(standardized_sleep, prop = 0.70, strata = Sleep_Disorder)
-sleep_train <- training(sleep_split)
-sleep_test <- testing(sleep_split)
+knn_model_with_best_k <- nearest_neighbor(weight_func = "rectangular", neighbors = best_k) |>
+  set_engine("kknn") |>
+  set_mode("classification")
 
+knn_fit <- workflow() |>
+  add_recipe(sleep_recipe) |>
+  add_model(knn_model_with_best_k) |>
+  fit(data = sleep_training)
 
+sleep_test_pred <- predict(knn_fit, sleep_testing) |>
+  bind_cols(sleep_testing) 
