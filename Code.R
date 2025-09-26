@@ -28,7 +28,7 @@ sleep_data_clean <- sleep_data |>
                              BMI_Category == "Obese" ~ 4))|>
   
   mutate(Gender_num = case_when(Gender == "Male" ~ 1, 
-                                Gender == "Female"~ 2,))|>
+                                Gender == "Female"~ 2))|>
   select(-BMI_Category, -Gender) |>
   
   mutate(Sleep_Disorder = as_factor(Sleep_Disorder)) |>
@@ -58,7 +58,7 @@ knn_tune <- nearest_neighbor(weight_func = "rectangular", neighbors = tune()) |>
   set_engine("kknn") |>
   set_mode("classification")
 
-k_vals <- tibble(neighbors = seq(from = 1, to = 10, by = 1))
+k_vals <- tibble(neighbors = seq(from = 1, to = 89, by = 3))
 
 num_vfold <- vfold_cv(sleep_training, v = 5, strata = Sleep_Disorder)
 
@@ -83,7 +83,7 @@ k_plot <- accuracies |>
   geom_point() +
   geom_line() +
   labs(title = "Accuracy vs K", x = "Neighbors", y = "Accuracy Estimate") +
-  scale_x_continuous(breaks = seq(0, 10, by = 1)) +  # adjusting the x-axis
+  scale_x_continuous(breaks = seq(0, 90, by = 5))
   scale_y_continuous(limits = c(0.4, 1.0)) # adjusting the y-axis
 k_plot
 
@@ -106,4 +106,21 @@ knn_fit <- workflow() |>
 sleep_test_pred <- predict(knn_fit, sleep_testing) |>
   bind_cols(sleep_testing) 
 
+sleep_accuracy <- sleep_test_pred |>
+  metrics(truth = Sleep_Disorder, estimate = .pred_class) |>
+  filter(.metric == "accuracy")
 
+sleep_prediction <- sleep_test_pred|>
+  precision(truth = Sleep_Disorder, estimate = .pred_class, event_level="first")
+
+sleep_recall <- sleep_test_pred|>
+  recall(truth = Sleep_Disorder, estimate = .pred_class, event_level="first")
+
+confusion_matrix <- sleep_test_pred |>
+  conf_mat(truth = Sleep_Disorder, estimate = .pred_class)
+
+
+sleep_accuracy
+sleep_prediction
+sleep_recall
+confusion_matrix
