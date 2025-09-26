@@ -26,13 +26,13 @@ This report explores the **Sleep Health and Lifestyle Dataset** and builds a KNN
 
 
 ### Methods and Plan
-- Clean dataset  
+- Clean data set  
 - Visualize class distributions  
 - Tune KNN model  
 - Train KNN model  
 - Evaluate performance with accuracy, precision, recall, and confusion matrix  
-- Maximize recall to avoid false negatives  
 - Interpret results
+- Next steps
 
 
 ### Load Packages and set seed for reproducibility
@@ -52,7 +52,7 @@ head(sleep_data)
 
 ###  Clean data set
 First we clean the data set by renaming columns, assigning numerical values to categorical variables to use them as predictors. 
-```{r libraries, message=FALSE, warning=FALSE}
+```{r cleaning, message=FALSE, warning=FALSE}
 sleep_data_clean <- sleep_data |>
   select(-`Person ID`, -`Heart Rate`, -`Occupation`)|>
   rename(Sleep_Disorder = `Sleep Disorder`)|>
@@ -100,7 +100,7 @@ counts_graph
 ```
 
 ###  Tune KNN model
-To make the model as accurate as possible, we need to decide how much observations (neighbors or k) it should use when classifying a new observation. We experiment with different settings of k in a range of 1 to the size of the testing set and compare how well the model performs with each. From the plot, we can see that the number of neighbors that gives us the highest accuracy is `r best_k`.
+To make the model as accurate as possible, we need to decide how much observations (neighbors or k) it should use when classifying a new observation. We experiment with different settings of k in a range of 1 to the size of the testing set and compare how well the model performs with each. 
 ```{r Tuning model, echo=FALSE}
 sleep_split <- initial_split(sleep_data_clean, prop = 0.75, strata = Sleep_Disorder)
 sleep_training <- training(sleep_split)
@@ -154,6 +154,7 @@ best_k <- accuracies |>
 k_plot
 best_k
 ```
+From the plot, we can see that the number of neighbors that gives us the highest accuracy is `r best_k`.
 
 ```{r training model, echo=FALSE}
 knn_model_with_best_k <- nearest_neighbor(weight_func = "rectangular", neighbors = best_k) |>
@@ -189,5 +190,54 @@ sleep_accuracy
 sleep_prediction
 sleep_recall
 confusion_matrix
+
+acc_val   <- sleep_accuracy$.estimate
+prec_val  <- sleep_prediction$.estimate
+recall_val <- sleep_recall$.estimate
+
 ```
 ### Interpretation of results
+
+#### Results:
+- Accuracy: `r acc_val`
+- Precision: `r prec_val`
+- Recall: `r recall_val`
+- Confusion matrix: 
+
+```{r confmat, echo=FALSE}
+confusion_matrix
+```
+
+#### Interpretation:
+
+- **Accuracy:** The model predicted the correct sleep disorder (None, Sleep Apnea, or Insomnia) `r acc_val * 100`% of the time.  
+- **Precision:** On average across all classes, when the model predicted a person’s sleep disorder, it was correct `r prec_val * 100`% of the time.  
+- **Recall:** On average across all classes, the model correctly identified `r recall_val * 100`% of individuals with their true sleep disorder.
+
+##### **Confusion matrix class by class breakdown**:
+###### **Class = None**
+- **True Positives (TP):** 44  
+- **False Positives (FP):** 7  
+  - Predicted *None* when it was actually *Sleep Apnea* or *Insomnia*  
+- **False Negatives (FN):** 4  
+  - It was *None*, but predicted *Sleep Apnea* or *Insomnia*  
+
+
+###### **Class = Sleep Apnea**
+- **True Positives (TP):** 16  
+- **False Positives (FP):** 3  
+  - Predicted *Sleep Apnea* when it was actually *None* or *Insomnia*  
+- **False Negatives (FN):** 5  
+  - It was *Sleep Apnea*, but predicted *None* or *Insomnia*  
+
+---
+
+###### **Class = Insomnia**
+- **True Positives (TP):** 15  
+- **False Positives (FP):** 4  
+  - Predicted *Insomnia* when it was actually *None* or *Sleep Apnea*  
+- **False Negatives (FN):** 3  
+  - It was *Insomnia*, but predicted *None* or *Sleep Apnea* 
+
+### Next Steps
+Overall, the model is effective however it may benefit by tuning it to optimize recall. This way, we minimize the amounts of false negatives and we avoid diagnosing someone with no sleep disorder when they may be at risk of one. 
