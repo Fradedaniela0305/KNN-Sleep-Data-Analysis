@@ -54,6 +54,7 @@ The analysis follows a standard supervised learning pipeline:
    - Recall 
    - Confusion matrix
 
+
 ## Results
 
 **Test Set Performance**
@@ -88,8 +89,14 @@ The analysis follows a standard supervised learning pipeline:
 - Random seed set to ensure reproducibility.
 - Implemented using `tidyverse`, `tidymodels`, and `themis`.
 
+## Reports
+
+- 📄 [Full report](Full%20report.html)
+- 🧾 [Full report with code](Full%20report%20with%20code.html)
+
 ## References
 - Kaggle. (2025). *Lifestyle and Sleep Patterns* [Dataset].  
   https://www.kaggle.com/datasets/minahilfatima12328/lifestyle-and-sleep-patterns
 
 - Timbers, T., Campbell, T., & Lee, M. (2024). *Data Science: A First Introduction*.
+  
