@@ -57,9 +57,9 @@ The analysis follows a standard supervised learning pipeline:
 ## Results
 
 **Test Set Performance**
-- **Accuracy: ** 84.27%  
+- **Accuracy:**  84.27%  
 - **Precision:** 80.95%  
-- **Recall:   ** 83.14%
+- **Recall:**    83.14%
 
 ### Confusion Matrix
 | Prediction \ Truth | None | Sleep Apnea | Insomnia |
